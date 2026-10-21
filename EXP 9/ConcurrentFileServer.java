@@ -1,91 +1,55 @@
 
 import java.net.*;
 import java.io.*;
+import java.nio.file.*;
 
-class ConcurrentFileServer {
+class Server {
     public static void main(String args[]) throws Exception {
-
-        // Variable declarations
         DatagramSocket s;
-        DatagramPacket dp;
-        byte b[], rb[];
-        InetAddress ip;
-        int port;
+        DatagramPacket rp;
+        byte b[];
         long pid;
-        String name;
 
-        // Step 1: Create UDP server socket
         s = new DatagramSocket(5000);
-
-        // Step 2: Get server PID
         pid = ProcessHandle.current().pid();
 
-        System.out.println("Server Started...");
-
-        // Step 3: Receive requests continuously
         while (true) {
-            rb = new byte[1024];
+            b = new byte[1024];
+            rp = new DatagramPacket(b, b.length);
+            s.receive(rp);
 
-            dp = new DatagramPacket(rb, rb.length);
+            final InetAddress ip = rp.getAddress();
+            final int port = rp.getPort();
+            final String name = new String(rp.getData(), 0, rp.getLength());
 
-            s.receive(dp);
+            Thread t = new Thread(() -> {
+                try {
+                    String result;
+                    File f;
+                    long tid;
+                    byte data[];
+                    DatagramPacket dp;
 
-            // Step 4: Get client IP and port
-            ip = dp.getAddress();
-            port = dp.getPort();
+                    tid = Thread.currentThread().threadId();
+                    result = "Server PID: " + pid + "\n";
+                    result += "Servicing Thread ID: " + tid + "\n";
 
-            // Step 5: Convert received bytes into string
-            name = new String(dp.getData(), 0, dp.getLength());
+                    f = new File(name);
 
-            // Step 6: Create thread for client
-            final InetAddress clientIP = ip;
-            final int clientPort = port;
-            final String fileName = name;
+                    if (f.exists() && f.isFile())
+                        result += "File Found\n" + Files.readString(f.toPath());
+                    else
+                        result += "File Not Found";
 
-            Thread t = new Thread(new Runnable() {
-                public void run() {
-                    try {
-                        String result;
-                        File f;
-                        FileReader fr;
-                        BufferedReader fin;
-                        String line;
+                    data = result.getBytes();
+                    dp = new DatagramPacket(data, data.length, ip, port);
+                    s.send(dp);
 
-                        result = "Server PID: " + pid + "\n";
-                        f = new File(fileName);
-
-                        if (f.exists() && f.isFile()) {
-                            result += "File Found\n";
-
-                            fr = new FileReader(f);
-                            fin = new BufferedReader(fr);
-
-                            while ((line = fin.readLine()) != null) {
-                                result += line + "\n";
-                            }
-
-                            fin.close();
-                        } else {
-                            result += "File Not Found";
-                        }
-
-                        // Convert response into bytes
-                        byte b[] = result.getBytes();
-
-                        // Create reply packet
-                        DatagramPacket rp = new DatagramPacket(
-                            b, b.length, clientIP, clientPort);
-
-                        // Send reply
-                        s.send(rp);
-
-                    } catch (Exception e) {
-                        System.out.println("Error handling client");
-                    }
+                } catch (Exception e) {
+                    System.out.println(e);
                 }
             });
 
-            // Step 7: Start thread
             t.start();
         }
     }
