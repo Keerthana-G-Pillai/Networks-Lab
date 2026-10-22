@@ -1,62 +1,44 @@
-import java.io.*;
+
 import java.net.*;
+import java.io.*;
 import java.util.*;
 
-class ChatServer {
-    static Vector<Socket> v = new Vector<>();
+public class ChatServer{
+    static Vector <PrintWriter> v=new Vector<>();
+    public static void main(String args[] )throws Exception{
+            ServerSocket ss=new ServerSocket(5000);
+            while(true){
+                Socket s=ss.accept();
+                Thread t = new Thread(()->{
+                    try{
 
-    public static void main(String args[]) throws Exception {
-        ServerSocket ss;
-        Socket s;
-
-        ss = new ServerSocket(5000);
-        System.out.println("Server started");
-
-        while (true) {
-            s = ss.accept();
-            System.out.println("Client connected");
-            v.add(s);
-
-            final Socket cs = s;
-
-            Thread t = new Thread(() -> {
-                try {
-                    BufferedReader in;
-                    PrintWriter out;
-                    String name, msg;
-
-                    in = new BufferedReader(
-                        new InputStreamReader(cs.getInputStream()));
-                    out = new PrintWriter(cs.getOutputStream(), true);
-
-                    name = in.readLine();
-                    System.out.println(name + " joined");
-
-                    while ((msg = in.readLine()) != null) {
-                        if (msg.equalsIgnoreCase("exit"))
-                            break;
-
-                        System.out.println(name + ": " + msg);
-
-                        for (Socket x : v) {
-                            if (x != cs) {
-                                PrintWriter o = new PrintWriter(
-                                    x.getOutputStream(), true);
-                                o.println(name + ": " + msg);
+                        BufferedReader in=new BufferedReader(new InputStreamReader(s.getInputStream()));
+                        PrintWriter out=new PrintWriter(s.getOutputStream(),true);
+                        String name=in.readLine();
+                        String msg;
+                        v.add(out);
+                        System.out.println(name+"joined");
+                        while((msg=in.readLine())!=null){
+                            if (msg.equals("/exit")) break;
+                            for(PrintWriter p:v){
+                                if(p!=out) {
+                                    p.println(msg+"result");
+                                }
                             }
                         }
+                        v.remove(out);
+                        System.out.println(name+"left");
+
                     }
-
-                    v.remove(cs);
-                    System.out.println(name + " left");
-                    cs.close();
-
-                } catch (Exception e) {
-                    v.remove(cs);
-                }
-            });
-
-            t.start();
-        }
+                    catch(Exception e){}
+                    finally{
+                        try{
+                            s.close();
+                        }
+                        catch(Exception e){}
+                    }
+                });
+                t.start();
+            }
     }
 }
